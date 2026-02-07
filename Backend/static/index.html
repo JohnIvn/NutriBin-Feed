@@ -6,19 +6,34 @@
   </head>
   <body>
     <h1>Live Video Feed</h1>
-    <img
-      id="video-feed"
-      style="width: 640px; height: 480px; background: #000"
-    />
-    <p id="status">Connecting...</p>
+    <div
+      style="
+        width: 640px;
+        height: 480px;
+        background: #000;
+        border: 2px solid #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <img
+        id="video-feed"
+        style="display: none; width: 100%; height: 100%; object-fit: contain"
+      />
+    </div>
+    <p>Server: <span id="server-status">Connecting...</span></p>
+    <p>Stream: <span id="stream-status">Offline</span></p>
 
     <script>
       const socket = io();
       const img = document.getElementById('video-feed');
-      const status = document.getElementById('status');
+      const serverStatus = document.getElementById('server-status');
+      const streamStatus = document.getElementById('stream-status');
 
       socket.on('connect', () => {
-        status.innerText = 'Connected';
+        serverStatus.innerText = 'Connected';
+        serverStatus.style.color = 'green';
       });
 
       socket.on('stream', (data) => {
@@ -26,16 +41,38 @@
         const blob = new Blob([data], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
 
+        // Ensure image is visible
+        if (img.style.display === 'none') {
+          img.style.display = 'block';
+        }
+
         // Clean up old object URL to prevent memory leaks
         const oldUrl = img.src;
         img.src = url;
-        if (oldUrl.startsWith('blob:')) {
+        if (oldUrl && oldUrl.startsWith('blob:')) {
           URL.revokeObjectURL(oldUrl);
         }
       });
 
+      socket.on('stream-status', (data) => {
+        if (data.active) {
+          streamStatus.innerText = 'Online';
+          streamStatus.style.color = 'green';
+        } else {
+          streamStatus.innerText = 'Offline';
+          streamStatus.style.color = 'red';
+          img.style.display = 'none';
+          img.src = '';
+        }
+      });
+
       socket.on('disconnect', () => {
-        status.innerText = 'Disconnected';
+        serverStatus.innerText = 'Disconnected';
+        serverStatus.style.color = 'red';
+        streamStatus.innerText = 'Offline';
+        streamStatus.style.color = 'red';
+        img.style.display = 'none';
+        img.src = '';
       });
     </script>
   </body>
