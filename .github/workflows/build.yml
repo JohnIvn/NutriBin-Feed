@@ -20,10 +20,6 @@ jobs:
             workdir: Backend
             lint: true
             test: true
-          - label: Frontend
-            workdir: Frontend
-            lint: true
-            test: false
     defaults:
       run:
         working-directory: ${{ matrix.workdir }}

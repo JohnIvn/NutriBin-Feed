@@ -4,10 +4,9 @@ Thank you for your interest in contributing to NutriBin! We welcome improvements
 
 ## Project Structure
 
-NutriBin is split into two main parts:
+NutriBin currently consists of:
 
 - `Backend/`: A NestJS application handling the API, database (PostgreSQL/Supabase), and services.
-- `Frontend/`: A Vite + React application for the web interface.
 
 ## How to contribute
 
@@ -45,21 +44,6 @@ NutriBin is split into two main parts:
 
 > **Tip:** Check the `Backend/scripts` folder and `package.json` for data seeding scripts (e.g., `npm run seed:admin`).
 
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```bash
-   cd Frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
 ## Branching & PR guidelines
 
 - Create a feature branch from `main`: `feature/short-description` or `fix/short-description`.
@@ -69,7 +53,6 @@ NutriBin is split into two main parts:
 ## Code style
 
 - **Backend**: Follow NestJS and TypeScript best practices. Use Prettier for formatting (`npm run format`).
-- **Frontend**: Follow React and Tailwind CSS conventions.
 
 ## Code of conduct
 
