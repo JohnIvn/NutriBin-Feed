@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Video Feed Monitoring</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h1>Live Video Feed</h1>
+    <img
+      id="video-feed"
+      style="width: 640px; height: 480px; background: #000"
+    />
+    <p id="status">Connecting...</p>
+
+    <script>
+      const socket = io();
+      const img = document.getElementById('video-feed');
+      const status = document.getElementById('status');
+
+      socket.on('connect', () => {
+        status.innerText = 'Connected';
+      });
+
+      socket.on('stream', (data) => {
+        // Data is received as an ArrayBuffer
+        const blob = new Blob([data], { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+
+        // Clean up old object URL to prevent memory leaks
+        const oldUrl = img.src;
+        img.src = url;
+        if (oldUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(oldUrl);
+        }
+      });
+
+      socket.on('disconnect', () => {
+        status.innerText = 'Disconnected';
+      });
+    </script>
+  </body>
+</html>
