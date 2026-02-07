@@ -2,10 +2,16 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy all files first to ensure we have package.json and the folder structure
+# Copy the entire repo
 COPY . .
 
-# Install dependencies
+# IF we are building from the repository root, move into the Backend folder
+# Otherwise, we stay in /app
+RUN if [ -d "Backend" ]; then \
+      mv Backend/* . && mv Backend/.[!.]* . 2>/dev/null || true; \
+    fi
+
+# Now package.json is guaranteed to be at /app/package.json
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Build the NestJS app
