@@ -5,9 +5,10 @@ import time
 import sys
 
 # Change this to your Railway app URL
-SERVER_URL = "http://localhost:3000" # Update this after deployment or for local testing
+SERVER_URL = "https://nutribin-feed.up.railway.app" # Update this after deployment or for local testing
 
-sio = socketio.Client()
+# Set logger=True and engineio_logger=True to see connection details
+sio = socketio.Client(logger=True, engineio_logger=True)
 
 @sio.event
 def connect():
@@ -55,7 +56,9 @@ def stream_video():
 
 if __name__ == "__main__":
     try:
-        sio.connect(SERVER_URL)
+        # Explicitly use websocket transport and set namespaces if needed
+        # Railway works best with standard HTTPS (443) and websocket transport
+        sio.connect(SERVER_URL, transports=['websocket'])
         stream_video()
     except Exception as e:
         print(f"Failed to connect: {e}")
