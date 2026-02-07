@@ -5,7 +5,7 @@ import time
 import sys
 
 # Change this to your Railway app URL
-SERVER_URL = "https://nutribin-feed.up.railway.app" # Update this after deployment or for local testing
+SERVER_URL = "https://nutribin-feed.up.railway.app/videostream" # Update this after deployment or for local testing
 
 # Set logger=True and engineio_logger=True to see connection details
 sio = socketio.Client(logger=True, engineio_logger=True)
