@@ -42,12 +42,17 @@ export class VideoStreamGateway
       this.producers.add(client.id);
       this.server.emit('stream-status', { active: true });
     }
-      if (!data || typeof data !== 'object') {
-          console.error('Received undefined or invalid payload:', data);
-          return;
-      }
-      const { id, frame } = data;
-      // Broadcast the video frame to all other connected clients
-      this.server.emit('stream', data);
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !('id' in data) ||
+      !('frame' in data)
+    ) {
+      console.error('Received invalid payload:', data);
+      return;
+    }
+    const { id, frame } = data;
+    // Broadcast the video frame to all other connected clients
+    this.server.emit('stream', data);
   }
 }
