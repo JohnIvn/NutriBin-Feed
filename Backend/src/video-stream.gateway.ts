@@ -38,6 +38,7 @@ export class VideoStreamGateway
 
   @SubscribeMessage('video-frame')
   handleVideoFrame(client: Socket, @MessageBody() data: any) {
+    console.log('VideoStreamGateway handler invoked - DEBUG');
     if (!this.producers.has(client.id)) {
       this.producers.add(client.id);
       this.server.emit('stream-status', { active: true });
