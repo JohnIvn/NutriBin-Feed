@@ -37,20 +37,28 @@
       });
 
       socket.on('stream', (data) => {
-        // Data is received as an ArrayBuffer
-        const blob = new Blob([data], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
-
-        // Ensure image is visible
-        if (img.style.display === 'none') {
-          img.style.display = 'block';
+        // Support two payload formats:
+        // 1) Binary ArrayBuffer (server emits raw bytes)
+        // 2) JSON object { id, frame } where frame is a base64 JPEG string
+        if (data && typeof data === 'object' && 'frame' in data) {
+          // base64 payload
+          const b64 = data.frame;
+          img.src = 'data:image/jpeg;base64,' + b64;
+          if (img.style.display === 'none') img.style.display = 'block';
+          return;
         }
 
-        // Clean up old object URL to prevent memory leaks
-        const oldUrl = img.src;
-        img.src = url;
-        if (oldUrl && oldUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(oldUrl);
+        // Fallback: assume ArrayBuffer / binary
+        try {
+          const blob = new Blob([data], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          if (img.style.display === 'none') img.style.display = 'block';
+
+          const oldUrl = img.src;
+          img.src = url;
+          if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+        } catch (err) {
+          console.error('Failed to render stream frame', err, data);
         }
       });
 
