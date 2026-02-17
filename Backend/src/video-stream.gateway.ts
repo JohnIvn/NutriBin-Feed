@@ -3,6 +3,7 @@ import {
   WebSocketServer,
   SubscribeMessage,
   MessageBody,
+  ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
@@ -37,8 +38,15 @@ export class VideoStreamGateway
   }
 
   @SubscribeMessage('video-frame')
-  handleVideoFrame(client: Socket, @MessageBody() data: any) {
+  handleVideoFrame(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
     console.log('VideoStreamGateway handler invoked - DEBUG');
+    if (!client || !client.id) {
+      console.error('handleVideoFrame: client missing or invalid', client);
+      return;
+    }
     if (!this.producers.has(client.id)) {
       this.producers.add(client.id);
       this.server.emit('stream-status', { active: true });
