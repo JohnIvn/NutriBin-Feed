@@ -9,6 +9,14 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
+type VideoFramePayload = { id: string; frame: string };
+
+function isVideoFramePayload(obj: unknown): obj is VideoFramePayload {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.id === 'string' && typeof o.frame === 'string';
+}
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -40,7 +48,7 @@ export class VideoStreamGateway
   @SubscribeMessage('video-frame')
   handleVideoFrame(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: unknown,
   ) {
     console.log('VideoStreamGateway handler invoked - DEBUG');
     if (!client || !client.id) {
@@ -51,17 +59,13 @@ export class VideoStreamGateway
       this.producers.add(client.id);
       this.server.emit('stream-status', { active: true });
     }
-    if (
-      !data ||
-      typeof data !== 'object' ||
-      !('id' in data) ||
-      !('frame' in data)
-    ) {
+    if (!isVideoFramePayload(data)) {
       console.error('Received invalid payload:', data);
       return;
     }
-    const { id, frame } = data;
-    // Broadcast the video frame to all other connected clients
-    this.server.emit('stream', data);
+
+    // Broadcast a well-typed payload to all connected clients
+    const payload: VideoFramePayload = { id: data.id, frame: data.frame };
+    this.server.emit('stream', payload);
   }
 }
