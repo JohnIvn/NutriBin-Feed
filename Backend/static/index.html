@@ -99,14 +99,28 @@
                   const h = y2 - y1;
 
                   const cls = p.class != null ? String(p.class) : '0';
-                  const colorMap = ['#00FF00','#FF0000','#00FFFF','#FFFF00','#FF00FF'];
-                  const color = colorMap[parseInt(cls) % colorMap.length] || '#00FF00';
+                  const colorMap = [
+                    '#00FF00',
+                    '#FF0000',
+                    '#00FFFF',
+                    '#FFFF00',
+                    '#FF00FF',
+                  ];
+                  const color =
+                    colorMap[parseInt(cls) % colorMap.length] || '#00FF00';
                   ctx.strokeStyle = color;
                   ctx.fillStyle = color;
                   ctx.strokeRect(x1, y1, w, h);
 
-                  const conf = p.confidence != null ? (p.confidence * 100).toFixed(1) + '%' : p.confidence != null ? p.confidence : '';
-                  const label = (p.class != null ? 'Class ' + p.class : '') + (conf ? ' ' + conf : '');
+                  const conf =
+                    p.confidence != null
+                      ? (p.confidence * 100).toFixed(1) + '%'
+                      : p.confidence != null
+                        ? p.confidence
+                        : '';
+                  const label =
+                    (p.class != null ? 'Class ' + p.class : '') +
+                    (conf ? ' ' + conf : '');
                   const textX = x1 + 4;
                   const textY = y1 + 16;
                   const metrics = ctx.measureText(label);
@@ -126,12 +140,20 @@
 
             // build overlay lines from percentages or classifications
             let lines = [];
-            if (data.classification_percentages && typeof data.classification_percentages === 'object') {
+            if (
+              data.classification_percentages &&
+              typeof data.classification_percentages === 'object'
+            ) {
               Object.keys(data.classification_percentages).forEach((k) => {
                 lines.push(`${k}: ${data.classification_percentages[k]}%`);
               });
-            } else if (Array.isArray(data.classifications) && data.classifications.length) {
-              lines = data.classifications.map((c) => `${c.label}: ${(c.score * 100).toFixed(2)}%`);
+            } else if (
+              Array.isArray(data.classifications) &&
+              data.classifications.length
+            ) {
+              lines = data.classifications.map(
+                (c) => `${c.label}: ${(c.score * 100).toFixed(2)}%`,
+              );
             }
             if (lines.length) {
               classOverlay = { lines: lines, expiry: Date.now() + 5000 };
