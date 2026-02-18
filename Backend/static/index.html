@@ -69,32 +69,109 @@
         }
       });
 
-      // Also handle direct producer payloads (video-frame) which may include
-      // `classification_percentages` or `classifications` inside the frame payload.
+      // Also handle direct producer payloads (video-frame) which include a
+      // base64 `frame` and optional `classification_percentages` or `classifications`.
       socket.on('video-frame', (data) => {
         try {
-          const src = data && data.frame ? data : null;
-          if (!src) return;
-          // prefer explicit mapping
-          const map = src.classification_percentages || null;
-          if (map && typeof map === 'object') {
-            const lines = Object.keys(map).map((k) => `${k}: ${map[k]}%`);
-            classOverlay = { lines: lines, expiry: Date.now() + 5000 };
-            return;
-          }
-          // fallback to classifications array
-          if (
-            Array.isArray(src.classifications) &&
-            src.classifications.length
-          ) {
-            const lines = src.classifications.map(
-              (c) => `${c.label}: ${(c.score * 100).toFixed(2)}%`,
-            );
-            classOverlay = { lines: lines, expiry: Date.now() + 5000 };
-            return;
-          }
+          if (!data || typeof data !== 'object' || !('frame' in data)) return;
+          const b64 = data.frame;
+          const img = new Image();
+          img.onload = () => {
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            // draw base image
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            // draw predictions if present (expect xyxy coordinates)
+            if (Array.isArray(data.predictions)) {
+              ctx.lineWidth = 2;
+              ctx.font = '16px sans-serif';
+              data.predictions.forEach((p) => {
+                try {
+                  const xy = p.xyxy || p.box || null;
+                  if (!xy || xy.length < 4) return;
+                  const x1 = xy[0];
+                  const y1 = xy[1];
+                  const x2 = xy[2];
+                  const y2 = xy[3];
+                  const w = x2 - x1;
+                  const h = y2 - y1;
+
+                  const cls = p.class != null ? String(p.class) : '0';
+                  const colorMap = ['#00FF00','#FF0000','#00FFFF','#FFFF00','#FF00FF'];
+                  const color = colorMap[parseInt(cls) % colorMap.length] || '#00FF00';
+                  ctx.strokeStyle = color;
+                  ctx.fillStyle = color;
+                  ctx.strokeRect(x1, y1, w, h);
+
+                  const conf = p.confidence != null ? (p.confidence * 100).toFixed(1) + '%' : p.confidence != null ? p.confidence : '';
+                  const label = (p.class != null ? 'Class ' + p.class : '') + (conf ? ' ' + conf : '');
+                  const textX = x1 + 4;
+                  const textY = y1 + 16;
+                  const metrics = ctx.measureText(label);
+                  const textW = metrics.width + 6;
+                  const textH = 18;
+                  ctx.globalAlpha = 0.6;
+                  ctx.fillRect(textX - 3, textY - 14, textW, textH);
+                  ctx.globalAlpha = 1.0;
+                  ctx.fillStyle = '#000';
+                  ctx.fillText(label, textX, textY);
+                  ctx.fillStyle = color;
+                } catch (err) {
+                  // ignore per-prediction errors
+                }
+              });
+            }
+
+            // build overlay lines from percentages or classifications
+            let lines = [];
+            if (data.classification_percentages && typeof data.classification_percentages === 'object') {
+              Object.keys(data.classification_percentages).forEach((k) => {
+                lines.push(`${k}: ${data.classification_percentages[k]}%`);
+              });
+            } else if (Array.isArray(data.classifications) && data.classifications.length) {
+              lines = data.classifications.map((c) => `${c.label}: ${(c.score * 100).toFixed(2)}%`);
+            }
+            if (lines.length) {
+              classOverlay = { lines: lines, expiry: Date.now() + 5000 };
+            }
+
+            // draw classification overlay immediately (same style as stream handler)
+            try {
+              if (classOverlay && Date.now() < classOverlay.expiry) {
+                ctx.save();
+                ctx.font = '18px sans-serif';
+                const padding = 8;
+                let maxW = 0;
+                classOverlay.lines.forEach((ln) => {
+                  const m = ctx.measureText(ln);
+                  if (m.width > maxW) maxW = m.width;
+                });
+                const boxW = maxW + padding * 2;
+                const boxH = classOverlay.lines.length * 20 + padding * 2;
+                const x = 8;
+                const y = 8;
+                ctx.globalAlpha = 0.7;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x, y, boxW, boxH);
+                ctx.globalAlpha = 1.0;
+                ctx.fillStyle = '#fff';
+                classOverlay.lines.forEach((ln, idx) => {
+                  ctx.fillText(ln, x + padding, y + padding + 18 * (idx + 0));
+                });
+                ctx.restore();
+              }
+            } catch (err) {
+              console.warn('Overlay draw error', err);
+            }
+
+            canvas.style.display = 'block';
+          };
+          img.onerror = (e) => console.error('Image load error', e);
+          img.src = 'data:image/jpeg;base64,' + b64;
         } catch (err) {
-          console.warn('video-frame classification parse error', err, data);
+          console.warn('video-frame handling error', err, data);
         }
       });
 
