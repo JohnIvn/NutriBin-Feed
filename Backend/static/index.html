@@ -69,6 +69,35 @@
         }
       });
 
+      // Also handle direct producer payloads (video-frame) which may include
+      // `classification_percentages` or `classifications` inside the frame payload.
+      socket.on('video-frame', (data) => {
+        try {
+          const src = data && data.frame ? data : null;
+          if (!src) return;
+          // prefer explicit mapping
+          const map = src.classification_percentages || null;
+          if (map && typeof map === 'object') {
+            const lines = Object.keys(map).map((k) => `${k}: ${map[k]}%`);
+            classOverlay = { lines: lines, expiry: Date.now() + 5000 };
+            return;
+          }
+          // fallback to classifications array
+          if (
+            Array.isArray(src.classifications) &&
+            src.classifications.length
+          ) {
+            const lines = src.classifications.map(
+              (c) => `${c.label}: ${(c.score * 100).toFixed(2)}%`,
+            );
+            classOverlay = { lines: lines, expiry: Date.now() + 5000 };
+            return;
+          }
+        } catch (err) {
+          console.warn('video-frame classification parse error', err, data);
+        }
+      });
+
       socket.on('stream', (data) => {
         // Expect JSON object { id, frame, predictions?, stats? }
         // frame is a base64 JPEG string (no data: prefix)
