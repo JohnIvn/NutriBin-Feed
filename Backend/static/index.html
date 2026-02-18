@@ -17,17 +17,20 @@
         justify-content: center;
       "
     >
-      <img
-        id="video-feed"
+      <canvas
+        id="video-canvas"
+        width="640"
+        height="480"
         style="display: none; width: 100%; height: 100%; object-fit: contain"
-      />
+      ></canvas>
     </div>
     <p>Server: <span id="server-status">Connecting...</span></p>
     <p>Stream: <span id="stream-status">Offline</span></p>
 
     <script>
       const socket = io();
-      const img = document.getElementById('video-feed');
+      const canvas = document.getElementById('video-canvas');
+      const ctx = canvas.getContext('2d');
       const serverStatus = document.getElementById('server-status');
       const streamStatus = document.getElementById('stream-status');
 
@@ -37,26 +40,96 @@
       });
 
       socket.on('stream', (data) => {
-        // Support two payload formats:
-        // 1) Binary ArrayBuffer (server emits raw bytes)
-        // 2) JSON object { id, frame } where frame is a base64 JPEG string
-        if (data && typeof data === 'object' && 'frame' in data) {
-          // base64 payload
-          const b64 = data.frame;
-          img.src = 'data:image/jpeg;base64,' + b64;
-          if (img.style.display === 'none') img.style.display = 'block';
-          return;
-        }
-
-        // Fallback: assume ArrayBuffer / binary
+        // Expect JSON object { id, frame, predictions?, stats? }
+        // frame is a base64 JPEG string (no data: prefix)
         try {
-          const blob = new Blob([data], { type: 'image/jpeg' });
-          const url = URL.createObjectURL(blob);
-          if (img.style.display === 'none') img.style.display = 'block';
+          if (!data || typeof data !== 'object' || !('frame' in data)) {
+            // Fallback: assume binary ArrayBuffer
+            const blob = new Blob([data], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              ctx.drawImage(img, 0, 0);
+              canvas.style.display = 'block';
+              URL.revokeObjectURL(url);
+            };
+            img.src = url;
+            return;
+          }
 
-          const oldUrl = img.src;
-          img.src = url;
-          if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+          const b64 = data.frame;
+          const img = new Image();
+          img.onload = () => {
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            // draw base image
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            // draw predictions if present (expect xyxy coordinates)
+            if (Array.isArray(data.predictions)) {
+              ctx.lineWidth = 2;
+              ctx.font = '16px sans-serif';
+              data.predictions.forEach((p) => {
+                try {
+                  const xy = p.xyxy || p.box || null;
+                  if (!xy || xy.length < 4) return;
+                  const x1 = xy[0];
+                  const y1 = xy[1];
+                  const x2 = xy[2];
+                  const y2 = xy[3];
+                  const w = x2 - x1;
+                  const h = y2 - y1;
+
+                  // color by class if available
+                  const cls = p.class != null ? String(p.class) : '0';
+                  const colorMap = [
+                    '#00FF00',
+                    '#FF0000',
+                    '#00FFFF',
+                    '#FFFF00',
+                    '#FF00FF',
+                  ];
+                  const color =
+                    colorMap[parseInt(cls) % colorMap.length] || '#00FF00';
+                  ctx.strokeStyle = color;
+                  ctx.fillStyle = color;
+                  ctx.strokeRect(x1, y1, w, h);
+
+                  // label text
+                  const conf =
+                    p.confidence != null
+                      ? (p.confidence * 100).toFixed(1) + '%'
+                      : p.confidence != null
+                        ? p.confidence
+                        : '';
+                  const label =
+                    (p.class != null ? 'Class ' + p.class : '') +
+                    (conf ? ' ' + conf : '');
+                  const textX = x1 + 4;
+                  const textY = y1 + 16;
+                  // background for text
+                  const metrics = ctx.measureText(label);
+                  const textW = metrics.width + 6;
+                  const textH = 18;
+                  ctx.globalAlpha = 0.6;
+                  ctx.fillRect(textX - 3, textY - 14, textW, textH);
+                  ctx.globalAlpha = 1.0;
+                  ctx.fillStyle = '#000';
+                  ctx.fillText(label, textX, textY);
+                  ctx.fillStyle = color;
+                } catch (err) {
+                  // ignore per-prediction errors
+                }
+              });
+            }
+
+            canvas.style.display = 'block';
+          };
+          img.onerror = (e) => console.error('Image load error', e);
+          img.src = 'data:image/jpeg;base64,' + b64;
         } catch (err) {
           console.error('Failed to render stream frame', err, data);
         }

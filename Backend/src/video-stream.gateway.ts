@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-type VideoFramePayload = { id: string; frame: string };
+type VideoFramePayload = { id: string; frame: string; [key: string]: any };
 
 function isVideoFramePayload(obj: unknown): obj is VideoFramePayload {
   if (typeof obj !== 'object' || obj === null) return false;
@@ -64,8 +64,10 @@ export class VideoStreamGateway
       return;
     }
 
-    // Broadcast a well-typed payload to all connected clients
-    const payload: VideoFramePayload = { id: data.id, frame: data.frame };
+    // Broadcast the original payload (including optional metadata/predictions)
+    // We validated required fields with `isVideoFramePayload` above, so it's
+    // safe to treat `data` as a VideoFramePayload and forward everything.
+    const payload = data as VideoFramePayload;
     this.server.emit('stream', payload);
   }
 }
