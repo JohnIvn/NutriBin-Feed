@@ -11,10 +11,24 @@ import { Server, Socket } from 'socket.io';
 
 type VideoFramePayload = { id: string; frame: string; [key: string]: any };
 
+type ClassificationPayload = {
+  image?: string;
+  predictions?: any[];
+  ts?: number;
+  [key: string]: any;
+};
+
 function isVideoFramePayload(obj: unknown): obj is VideoFramePayload {
   if (typeof obj !== 'object' || obj === null) return false;
   const o = obj as Record<string, unknown>;
   return typeof o.id === 'string' && typeof o.frame === 'string';
+}
+
+function isClassificationPayload(obj: unknown): obj is ClassificationPayload {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const o = obj as Record<string, unknown>;
+  // basic check: should have predictions array or image field
+  return Array.isArray(o.predictions) || typeof o.image === 'string';
 }
 
 @WebSocketGateway({
@@ -69,5 +83,20 @@ export class VideoStreamGateway
     // safe to treat `data` as a VideoFramePayload and forward everything.
     const payload = data as VideoFramePayload;
     this.server.emit('stream', payload);
+  }
+
+  @SubscribeMessage('classification')
+  handleClassification(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: unknown,
+  ) {
+    console.log('Received classification event from', client.id);
+    if (!isClassificationPayload(data)) {
+      console.error('Invalid classification payload:', data);
+      return;
+    }
+    const payload = data as ClassificationPayload;
+    // Broadcast classification payload to all clients
+    this.server.emit('classification', payload);
   }
 }

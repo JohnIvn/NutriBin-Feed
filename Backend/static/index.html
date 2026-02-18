@@ -38,10 +38,35 @@
       const ctx = canvas.getContext('2d');
       const serverStatus = document.getElementById('server-status');
       const streamStatus = document.getElementById('stream-status');
+      let classOverlay = null; // { lines: string[], expiry: timestamp }
 
       socket.on('connect', () => {
         serverStatus.innerText = 'Connected';
         serverStatus.style.color = 'green';
+      });
+
+      socket.on('classification', (data) => {
+        // data: { image, predictions: [{label, probability}], ts }
+        try {
+          const preds = Array.isArray(data.predictions) ? data.predictions : [];
+          const lines = preds.map(
+            (p) => `${p.label}: ${(p.probability * 100).toFixed(1)}%`,
+          );
+          if (
+            lines.length === 0 &&
+            data.predictions &&
+            typeof data.predictions === 'object'
+          ) {
+            // single prediction object case
+            const p = data.predictions;
+            lines.push(
+              `${p.label || p.id || ''}: ${((p.probability || p.prob) * 100 || 0).toFixed(1)}%`,
+            );
+          }
+          classOverlay = { lines: lines, expiry: Date.now() + 5000 };
+        } catch (err) {
+          console.warn('Invalid classification payload', err, data);
+        }
       });
 
       socket.on('stream', (data) => {
@@ -57,6 +82,35 @@
               canvas.width = img.naturalWidth;
               canvas.height = img.naturalHeight;
               ctx.drawImage(img, 0, 0);
+              // draw possible classification overlay
+              try {
+                if (classOverlay && Date.now() < classOverlay.expiry) {
+                  ctx.save();
+                  ctx.font = '18px sans-serif';
+                  const lines = classOverlay.lines || [];
+                  const padding = 8;
+                  let maxW = 0;
+                  lines.forEach((ln) => {
+                    const m = ctx.measureText(ln);
+                    if (m.width > maxW) maxW = m.width;
+                  });
+                  const boxW = maxW + padding * 2;
+                  const boxH = lines.length * 20 + padding * 2;
+                  const x = 8;
+                  const y = 8;
+                  ctx.globalAlpha = 0.7;
+                  ctx.fillStyle = '#000';
+                  ctx.fillRect(x, y, boxW, boxH);
+                  ctx.globalAlpha = 1.0;
+                  ctx.fillStyle = '#fff';
+                  lines.forEach((ln, idx) => {
+                    ctx.fillText(ln, x + padding, y + padding + 18 * (idx + 0));
+                  });
+                  ctx.restore();
+                }
+              } catch (err) {
+                console.warn('Overlay draw error', err);
+              }
               canvas.style.display = 'block';
               URL.revokeObjectURL(url);
             };
@@ -131,6 +185,38 @@
               });
             }
 
+            // draw classification overlay if present
+            try {
+              if (classOverlay && Date.now() < classOverlay.expiry) {
+                const lines = classOverlay.lines || [];
+                if (lines.length) {
+                  ctx.save();
+                  ctx.font = '18px sans-serif';
+                  const padding = 8;
+                  let maxW = 0;
+                  lines.forEach((ln) => {
+                    const m = ctx.measureText(ln);
+                    if (m.width > maxW) maxW = m.width;
+                  });
+                  const boxW = maxW + padding * 2;
+                  const boxH = lines.length * 20 + padding * 2;
+                  const x = 8;
+                  const y = 8;
+                  ctx.globalAlpha = 0.7;
+                  ctx.fillStyle = '#000';
+                  ctx.fillRect(x, y, boxW, boxH);
+                  ctx.globalAlpha = 1.0;
+                  ctx.fillStyle = '#fff';
+                  lines.forEach((ln, idx) => {
+                    ctx.fillText(ln, x + padding, y + padding + 18 * (idx + 0));
+                  });
+                  ctx.restore();
+                }
+              }
+            } catch (err) {
+              console.warn('Overlay draw error', err);
+            }
+
             canvas.style.display = 'block';
           };
           img.onerror = (e) => console.error('Image load error', e);
@@ -147,8 +233,11 @@
         } else {
           streamStatus.innerText = 'Offline';
           streamStatus.style.color = 'red';
-          img.style.display = 'none';
-          img.src = '';
+          canvas.style.display = 'none';
+          // clear canvas
+          try {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          } catch (e) {}
         }
       });
 
@@ -157,8 +246,10 @@
         serverStatus.style.color = 'red';
         streamStatus.innerText = 'Offline';
         streamStatus.style.color = 'red';
-        img.style.display = 'none';
-        img.src = '';
+        canvas.style.display = 'none';
+        try {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        } catch (e) {}
       });
     </script>
   </body>
